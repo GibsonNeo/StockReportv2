@@ -1,0 +1,159 @@
+
+
+# ====================== STOCKS UNIVERSE======================
+stock_tickers:
+  # 5B_5d_1mil_Vol: ["AA", "AAL", "AAON", "AAPL", "ABBV", "ABNB", "ABT", "ABTC", "ABVX", "ACGL", "ACHR", "ACI", "ACN", "ADBE", 
+  #   "ADC", "ADI", "ADM", "ADP", "ADSK", "ADT", "AEE", "AEG", "AEM", "AEP", "AER", "AES", "AFL", "AFRM", "AG", "AGI", 
+  #   "AGNC", "AHR", "AIG", "AJG", "AKAM", "AL", "ALAB", "ALB", "ALC", "ALGM", "ALGN", "ALK", "ALL", "ALLY", "ALNY", 
+  #   "AM", "AMAT", "AMCR", "AMD", "AME", "AMGN", "AMH", "AMKR", "AMRZ", "AMT", "AMTM", "AMX", "AMZN", "ANET", "AON", "AOS", 
+  #   "APA", "APG", "APH", "APO", "APP", "APTV", "AR", "ARCC", "ARE", "ARES", "ARM", "ARMK", "AS", "ASML", "ASTS", "ASX", 
+  #   "ATAT", "ATI", "AU", "AUB", "AUR", "AVAV", "AVGO", "AVTR", "AWK", "AXP", "AXTA", "AZN", "B", "BA", "BABA", "BAC", 
+  #   "BAH", "BALL", "BAM", "BAX", "BBIO", "BBVA", "BBWI", "BBY", "BCE", "BCS", "BDX", "BE", "BEKE", "BEN", "BG", "BHP", 
+  #   "BIDU", "BIIB", "BILI", "BILL", "BIRK", "BJ", "BK", "BKR", "BLDR", "BMNR", "BMRN", "BMY", "BN", "BNS", "BP", "BRO", 
+  #   "BROS", "BRX", "BSX", "BSY", "BTI", "BUD", "BULL", "BWA", "BWXT", "BX", "BXP", "BXSL", "BYD", "BZ", "C", "CADE", 
+  #   "CAG", "CAH", "CAR", "CARR", "CART", "CAT", "CAVA", "CB", "CBRE", "CCCS", "CCEP", "CCI", "CCJ", "CCK", "CCL", "CDE", 
+  #   "CDNS", "CDW", "CEG", "CELH", "CF", "CFG", "CFLT", "CG", "CGNX", "CHD", "CHRW", "CHTR", "CHWY", "CHYM", "CI", "CIEN", 
+  #   "CL", "CLF", "CLS", "CLX", "CM", "CMA", "CMCSA", "CME", "CMG", "CMS", "CNC", "CNH", "CNI", "CNM", "CNP", "CNQ", "COF", 
+  #   "COHR", "COIN", "COLB", "COO", "COP", "COR", "COST", "CP", "CPB", "CPNG", "CPRT", "CRBG", "CRCL", "CRDO", "CRH", "CRM", 
+  #   "CRSP", "CRWD", "CRWV", "CSCO", "CSGP", "CSX", "CTAS", "CTRA", "CTRE", "CTSH", "CTVA", "CUBE", "CUK", "CVE", "CVNA", 
+  #   "CVS", "CVX", "CWAN", "CX", "CYBR", "CYTK", "CZR", "D", "DAL", "DASH", "DAY", "DB", "DBX", "DD", "DDOG", "DE", "DECK", 
+  #   "DELL", "DEO", "DG", "DGX", "DHI", "DHR", "DINO", "DIS", "DKNG", "DKS", "DLR", "DLTR", "DOC", "DOCS", "DOCU", "DOV", 
+  #   "DOW", "DRI", "DRS", "DT", "DTE", "DUK", "DUOL", "DVN", "DXCM", "EA", "EAT", "EBAY", "EBR", "EC", "ECL", "ED", "EDU", 
+  #   "EFX", "EGO", "EIX", "EL", "ELAN", "ELF", "ELS", "ELV", "EMN", "EMR", "ENB", "ENTG", "EOG", "EPD", "EPRT", "EQH", 
+  #   "EQNR", "EQR", "EQT", "EQX", "ERIC", "ERJ", "ES", "ESI", "ESTC", "ET", "ETN", "ETR", "ETSY", "EVRG", "EW", "EXAS", 
+  #   "EXC", "EXE", "EXEL", "EXLS", "EXPD", "EXPE", "EXR", "F", "FAF", "FANG", "FAST", "FBIN", "FCX", "FDX", "FE", "FERG", 
+  #   "FHN", "FI", "FIS", "FITB", "FIVE", "FLEX", "FLG", "FLR", "FLS", "FLUT", "FNB", "FND", "FNF", "FOUR", "FOX", "FOXA", 
+  #   "FR", "FRO", "FROG", "FSLR", "FTAI", "FTI", "FTNT", "FTV", "FUTU", "FYBR", "G", "GAP", "GD", "GDDY", "GDS", "GE", 
+  #   "GEHC", "GEN", "GEV", "GFI", "GFL", "GFS", "GH", "GIL", "GILD", "GIS", "GLBE", "GLPI", "GLW", "GLXY", "GM", "GMAB", 
+  #   "GME", "GMED", "GNRC", "GNTX", "GOOG", "GOOGL", "GPC", "GPK", "GPN", "GRAB", "GRFS", "GS", "GSK", "GTES", "GTLB", 
+  #   "GTLS", "GXO", "HAL", "HALO", "HAS", "HBAN", "HBM", "HCA", "HD", "HDB", "HESM", "HIG", "HIMS", "HL", "HLN", "HMY", 
+  #   "HOLX", "HON", "HOOD", "HPE", "HPQ", "HQY", "HR", "HRB", "HRL", "HSBC", "HSIC", "HST", "HSY", "HTHT", "HUM", "HWM", 
+  #   "IAG", "IBKR", "IBM", "IBN", "ICE", "ICLR", "IFF", "ILMN", "INCY", "INFA", "INFY", "ING", "INSM", "INTC", "INTU", 
+  #   "INVH", "IONQ", "IONS", "IOT", "IP", "IPG", "IQV", "IR", "IREN", "IRM", "ISRG", "IT", "ITUB", "IVZ", "JBHT", "JBL", 
+  #   "JBS", "JCI", "JD", "JEF", "JHG", "JHX", "JNJ", "JOBY", "JPM", "K", "KBR", "KD", "KDP", "KEY", "KGC", "KHC", "KIM", 
+  #   "KKR", "KMB", "KMI", "KMX", "KNX", "KO", "KR", "KRC", "KRMN", "KT", "KTOS", "KVUE", "KVYO", "LBRDK", "LCID", "LEGN", 
+  #   "LEN", "LEVI", "LHX", "LI", "LIN", "LINE", "LITE", "LKQ", "LLY", "LMT", "LNC", "LNG", "LNSTY", "LNT", "LNW", "LOW", 
+  #   "LRCX", "LSCC", "LTH", "LTM", "LULU", "LUMN", "LUV", "LVS", "LW", "LYB", "LYFT", "LYV", "MA", "MAR", "MARA", "MAS", 
+  #   "MAT", "MBLY", "MCD", "MCHP", "MDB", "MDLZ", "MDT", "MET", "META", "MFC", "MFG", "MGA", "MGM", "MIR", "MKC", "MKSI", 
+  #   "MMC", "MMM", "MNDY", "MNST", "MO", "MOD", "MOH", "MOS", "MP", "MPC", "MPLX", "MRK", "MRNA", "MRP", "MRVL", "MS", 
+  #   "MSFT", "MSTR", "MT", "MTCH", "MTDR", "MTG", "MTH", "MU", "MUFG", "NBIS", "NCLH", "NDAQ", "NEE", "NEM", "NET", "NFLX", 
+  #   "NGD", "NI", "NIO", "NKE", "NLY", "NNN", "NOW", "NRG", "NSC", "NTAP", "NTDOY", "NTNX", "NTR", "NTRA", "NTRS", "NU", 
+  #   "NUE", "NVDA", "NVO", "NVS", "NVT", "NWG", "NWSA", "NXPI", "NXT", "NYT", "O", "OBDC", "ODFL", "OGE", "OHI", "OKE", 
+  #   "OKLO", "OKTA", "OLLI", "OMC", "ON", "ONB", "ONON", "ONTO", "OPEN", "ORCL", "ORI", "ORLY", "OTEX", "OTIS", "OVV", 
+  #   "OWL", "OXY", "PAA", "PAAS", "PANW", "PATH", "PAYX", "PBA", "PBR", "PCAR", "PCG", "PCOR", "PDD", "PEG", "PEGA", "PEP", 
+  #   "PFE", "PFG", "PFGC", "PG", "PGR", "PHM", "PINS", "PLD", "PLNT", "PLTR", "PM", "PNC", "PNFP", "PNR", "PNW", "PONY", 
+  #   "PPC", "PPG", "PPL", "PR", "PRMB", "PRU", "PSKY", "PSTG", "PSX", "PTC", "PWR", "PYLD", "PYPL", "QBTS", "QCOM", "QGEN", 
+  #   "QRVO", "QS", "QSR", "QXO", "RBLX", "RBRK", "RCI", "RCL", "RDDT", "RDY", "REG", "RELX", "REXR", "REZI", "RF", "RGC", 
+  #   "RGTI", "RIO", "RIOT", "RITM", "RIVN", "RKLB", "RKT", "RMBS", "RMD", "RNA", "ROIV", "ROKU", "ROL", "ROST", "RPRX", 
+  #   "RRC", "RSG", "RTX", "RVMD", "RVTY", "RY", "RYAAY", "RYAN", "RYCEY", "S", "SAIL", "SAN", "SAP", "SARO", "SATS", "SBS", 
+  #   "SBSW", "SBUX", "SCCO", "SCHW", "SE", "SFD", "SFM", "SGHC", "SGI", "SHEL", "SHOP", "SHW", "SIRI", "SJM", "SKX", "SLB", 
+  #   "SLM", "SMCI", "SMFG", "SMMT", "SMTC", "SN", "SNAP", "SNDK", "SNOW", "SNPS", "SNV", "SNY", "SO", "SOFI", "SONY", 
+  #   "SOUN", "SPG", "SPGI", "SPOT", "SQM", "SRAD", "SRE", "SSNC", "STAG", "STLA", "STLD", "STM", "STT", "STWD", "STX", 
+  #   "STZ", "SU", "SUI", "SUZ", "SW", "SWK", "SWKS", "SYF", "SYK", "SYM", "SYY", "T", "TAK", "TAL", "TAP", "TCEHY", "TCOM", 
+  #   "TD", "TEAM", "TECH", "TECK", "TEL", "TEM", "TER", "TEVA", "TFC", "TGT", "TGTX", "THC", "TIGO", "TJX", "TLN", "TME", 
+  #   "TMHC", "TMO", "TMUS", "TOL", "TOST", "TPG", "TPR", "TREX", "TRGP", "TRI", "TRMB", "TROW", "TRP", "TRU", "TRV", "TS", 
+  #   "TSCO", "TSEM", "TSLA", "TSM", "TSN", "TT", "TTD", "TTE", "TTEK", "TTWO", "TU", "TW", "TWLO", "TXN", "TXNM", "TXT", 
+  #   "U", "UAL", "UBER", "UBS", "UDR", "UEC", "UGI", "UL", "UMC", "UNH", "UNM", "UNP", "UPS", "UPST", "URBN", "USB", "USFD", 
+  #   "V", "VALE", "VEEV", "VFC", "VG", "VICI", "VIK", "VIPS", "VIV", "VLO", "VLTO", "VLY", "VNO", "VNOM", "VOD", "VRNA", 
+  #   "VRNS", "VRSK", "VRT", "VRTX", "VST", "VTR", "VTRS", "VVV", "VZ", "W", "WAB", "WAL", "WAY", "WBD", "WBS", "WCN", 
+  #   "WDAY", "WDC", "WEC", "WELL", "WES", "WFC", "WH", "WHR", "WIX", "WLK", "WM", "WMB", "WMG", "WMT", "WPC", "WPM", 
+  #   "WRB", "WSM", "WTRG", "WY", "WYNN", "XEL", "XOM", "XP", "XPEV", "XPO", "XYL", "XYZ", "YMM", "YPF", "YUM", "YUMC", 
+  #   "Z", "ZBH", "ZION", "ZM", "ZS", "ZTO", "ZTS", "ZWS"]
+      
+# ====================== Commodities UNIVERSE ======================
+commodities_tickers:
+  Gold: ["GLDM","IAUM","SGOL","GLD","GDX","RING"]
+  Silver: ["SLV","SIVR","SLVP"]
+  Platinum: ["PPLT","PLTM"]
+  Palladium: ["PALL"]
+  Copper: ["CPER","COPX"]
+  Precious: ["GLTR","REMX"]
+  Broad: ["PDBC","COMT","GSG","DBC"]
+  Oil: ["USO","BNO","USL","OILK"]
+  Natural_gas: ["UNL","UNG"]
+  Wheat: ["WEAT"]
+  Uranium: ["URNM","URA"]
+  Agriculture: ["DBA"]
+  Bitcoin: ["IBIT"]
+
+# ====================== ETF UNIVERSE (grouped baskets) ======================
+etf_tickers:
+  us_core:
+    bench: ["SPY","QQQ","DIA"]
+    equal_vs_cap: ["RSP"]
+    size: ["IWM","IJH"]
+
+  sectors:
+    spdr: ["XLK","XLY","XLP","XLE","XLF","XLV","XLI","XLB","XLRE","XLU","XLC"]
+    vanguard: ["VGT","VCR","VDC","VDE","VFH","VHT","VIS","VAW","VNQ","VOX"]
+    fidelity: ["FTEC","FDIS","FSTA","FENY","FNCL","FHLC","FIDU","FMAT","FCOM"]
+    subsectors: ["XBI","IHF","NLR","SMH","IYT","XHB","XME","XOP","SHLD","ITB"]
+    comm_services_alt: ["VOX","FCOM"]
+
+  style:
+    growth_value: ["IWF","IWD","VUG","VTV"]
+    factors: ["USMV","SPLV","MTUM","QUAL"]
+    div_growth: ["VIG","SCHD","SPHQ"]
+    buybacks: ["PKW"]
+
+  large_cap:
+    Blend: ["VOO","IVV","SPY","SCHX"]
+    Growth: ["VUG","QQQ","QQQM","SCHG","IWF"]
+    Value: ["VTV","SCHV","IWD"]
+    Momentum: ["SPMO","MTUM"]
+
+  small_mid_cap:
+    Small_blend: ["VB","IWM","SCHA"]
+    Small_value: ["VBR","IJS"]
+    Small_growth: ["VBK","IWO"]
+    Small_momentum: ["XSMO","SMLF"]
+    Mid_blend: ["IJH","VO","SCHM"]
+    Mid_value: ["VOE","IJJ"]
+    Mid_growth: ["VOT","IJK"]
+    Mid_momentum: ["XMMO"]
+
+  international:
+    broad: ["IXUS","VXUS","VEU"]
+    developed: ["VEA","IEFA","IDMO"]
+    momentum: ["IMTM","IDMO","UIVM"]
+    emerging: ["VWO","IEMG"]
+    Dividend: ["VYMI","SCHY"]
+    countries: ["EWW","EWJ","INDA","MCHI","EWG","EWU","EWC","EWA","EWZ","EWT","EWY","GREK","EPOL","VNM","EWP","ECNS","KURE","EWO","EWZS","EUFN"]
+
+# ====================== Vendors (free; optional) ======================
+vendors:
+  finra:
+    enabled: true
+    debug: false
+    probe_venues: false
+    cdn_only: true
+    use_legacy_hosts: false
+    venues: ["CNMS"]
+    force_include: ["CNMS"]
+    lookback_days: 10
+    average_days: 5
+    per_request_delay: 0.30
+    max_retries: 2
+    timeout: 12
+    
+  finnhub:
+    enabled: true
+    api_key: ""  # NEED TO SET env FINNHUB_API_KEY
+    horizon_days: 90
+    chunk_days: 30
+
+  fred:
+    enabled: true
+    api_key: "" # NEED TO SET env FRED_API_KEY
+    debug: false
+    timeout: 15
+    retries: 1
+    start: "2010-01-01"
+    series:
+      NAPM:
+        id: "NAPM"
+        frequency: "m"
+        units: null
+        aggregation_method: null
+
+# ====================== Report Config ======================

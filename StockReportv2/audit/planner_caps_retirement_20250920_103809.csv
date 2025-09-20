@@ -1,0 +1,19 @@
+item,percent,dollars
+Portfolio Value,1.0,310000.0
+Stocks sleeve,0.6,186000.0
+ETFs sleeve,0.3,93000.0
+Commodities sleeve,0.1,31000.0
+Per-stock cap,0.04,12400.0
+Per-ETF cap,0.12,37200.0
+Per-commodity cap,0.08,24800.0
+Stock sector: Technology,0.22,40920.0
+Stock sector: Health Care,0.16,29760.0
+Stock sector: Financials,0.12,22320.0
+Stock sector: Industrials,0.12,22320.0
+Stock sector: Consumer Discretionary,0.1,18600.0
+Stock sector: Consumer Staples,0.1,18600.0
+Stock sector: Energy,0.06,11160.0
+Stock sector: Materials,0.05,9300.0
+Stock sector: Communication Services,0.04,7440.0
+Stock sector: Utilities,0.02,3720.0
+Stock sector: Real Estate,0.01,1860.0
