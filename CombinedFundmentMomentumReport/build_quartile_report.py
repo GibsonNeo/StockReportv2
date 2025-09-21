@@ -4,10 +4,10 @@
 build_score_report.py
 
 Combines two CSVs on a key and computes scores for selected columns using one of two modes:
-  1) quartile: bucketed grades with optional decile nudge
-  2) standardized: continuous scores using zscore, robust_z, percentile, or minmax
+  1) quartile, bucketed grades with optional decile nudge
+  2) standardized, continuous scores using zscore, robust_z, percentile, or minmax
 
-The script is fully driven by a .yml config.
+Writes Excel or CSV. If Excel, can optionally apply conditional formatting by quartiles.
 """
 
 import argparse
@@ -18,7 +18,6 @@ from typing import Dict, Any, List, Tuple
 import pandas as pd
 import numpy as np
 import yaml
-from scipy.stats import norm
 
 # -------------------- util --------------------
 
@@ -170,6 +169,7 @@ def combine_standardized(scores: Dict[str, pd.Series], weights: Dict[str, float]
 
     combined_raw = weighted_sum / weight_present.replace(0.0, np.nan)
 
+    map_to = map_to or "percentile_0_100"
     if map_to == "linear_0_100":
         out = (combined_raw * 10.0) + 50.0
         out = out.clip(0.0, 100.0)
@@ -266,7 +266,106 @@ def compute_standardized_scores(df: pd.DataFrame, spec: List[Dict[str, Any]], st
     out["combined_z_weights_covered"] = weights_cov
     return out
 
+# -------------------- formatting helpers --------------------
+
+def reorder_after_column(df: pd.DataFrame, target_col: str, insert_col: str) -> pd.DataFrame:
+    if insert_col not in df.columns:
+        return df
+    if target_col not in df.columns:
+        return df
+    cols = list(df.columns)
+    cols.remove(insert_col)
+    idx = cols.index(target_col) + 1
+    cols.insert(idx, insert_col)
+    return df[cols]
+
+def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
+    try:
+        import openpyxl
+        from openpyxl.utils import get_column_letter
+        from openpyxl.styles import PatternFill
+        from openpyxl.formatting.rule import CellIsRule
+    except Exception:
+        # silently skip formatting if openpyxl is not available
+        return
+
+    wb = openpyxl.load_workbook(path)
+    ws = wb.active
+
+    # Colors
+    fill_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
+    fill_blue  = PatternFill(start_color="CCE5FF", end_color="CCE5FF", fill_type="solid")
+    fill_yell  = PatternFill(start_color="FFF3B0", end_color="FFF3B0", fill_type="solid")
+    fill_red   = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
+
+    # Helper to find column letter by header
+    header_to_col = {cell.value: cell.column for cell in next(ws.iter_rows(min_row=1, max_row=1))}
+    def col_letter(col_name: str):
+        idx = header_to_col.get(col_name)
+        if idx is None:
+            return None
+        from openpyxl.utils import get_column_letter
+        return get_column_letter(idx)
+
+    # Build list of columns to format, combined plus each source_column
+    format_cfg = cfg.get("formatting", {})
+    do_format = bool(format_cfg.get("enabled", True))
+    if not do_format:
+        wb.save(path)
+        return
+
+    graded = cfg.get("grade_columns", [])
+    target_columns = []
+
+    # Add combined percent
+    combined_col = "combined_z_percent_0_to_100"
+    if combined_col in df.columns:
+        target_columns.append((combined_col, "higher_better"))
+
+    # Add each original metric used for grading
+    for item in graded:
+        src = item.get("source_column")
+        direction = item.get("direction", "higher_better")
+        if src in df.columns:
+            target_columns.append((src, direction))
+
+    n_rows = df.shape[0]
+    start_row = 2
+    end_row = n_rows + 1
+
+    for col_name, direction in target_columns:
+        letter = col_letter(col_name)
+        if not letter:
+            continue
+
+        # Compute quartiles from data, ignore NaN
+        col_series = pd.to_numeric(df[col_name], errors="coerce")
+        q1 = col_series.quantile(0.25)
+        q2 = col_series.quantile(0.50)
+        q3 = col_series.quantile(0.75)
+
+        rng = f"{letter}{start_row}:{letter}{end_row}"
+
+        # Color assignment for higher better
+        top_fill, q3_fill, q2_fill, bottom_fill = fill_green, fill_blue, fill_yell, fill_red
+        if direction == "lower_better":
+            top_fill, q3_fill, q2_fill, bottom_fill = fill_red, fill_yell, fill_blue, fill_green
+
+        # Bottom quartile, less than or equal q1
+        ws.conditional_formatting.add(rng, CellIsRule(operator="lessThanOrEqual", formula=[str(q1)], fill=bottom_fill))
+        # Second quartile, between q1 and q2
+        ws.conditional_formatting.add(rng, CellIsRule(operator="between", formula=[str(q1), str(q2)], fill=q2_fill))
+        # Third quartile, between q2 and q3
+        ws.conditional_formatting.add(rng, CellIsRule(operator="between", formula=[str(q2), str(q3)], fill=q3_fill))
+        # Top quartile, greater than or equal q3
+        ws.conditional_formatting.add(rng, CellIsRule(operator="greaterThanOrEqual", formula=[str(q3)], fill=top_fill))
+
+    wb.save(path)
+
+# -------------------- main --------------------
+
 def main():
+    import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--input-a", required=True, help="Path to first CSV")
     ap.add_argument("--input-b", required=True, help="Path to second CSV")
@@ -314,6 +413,11 @@ def main():
         map_to = cfg.get("scoring", {}).get("map_to", "percentile_0_100")
         out = compute_standardized_scores(out, spec=spec, std_cfg=std_cfg, map_to=map_to)
 
+    # Optional, move combined_z_percent_0_to_100 right after a chosen column
+    insert_after = cfg.get("formatting", {}).get("insert_combined_after_column", "Sector")
+    if "combined_z_percent_0_to_100" in out.columns and insert_after in out.columns:
+        out = reorder_after_column(out, target_col=insert_after, insert_col="combined_z_percent_0_to_100")
+
     out_path = Path(args.out)
     if out_path.suffix.lower() in [".xlsx", ".xlsm", ".xltx", ".xltm"]:
         try:
@@ -322,6 +426,8 @@ def main():
             sys.stderr.write("openpyxl is required to write Excel files\n")
             sys.exit(2)
         out.to_excel(out_path, index=False)
+        # Apply conditional formatting if enabled
+        apply_excel_formatting(out_path, out, cfg)
     else:
         out.to_csv(out_path, index=False)
 

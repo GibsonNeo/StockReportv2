@@ -2,6 +2,10 @@
 join_key: ticker
 join_type: inner
 
+formatting:
+  enabled: true
+  insert_combined_after_column: Sector
+
 scoring:
   mode: standardized
   map_to: percentile_0_100
@@ -54,3 +58,4 @@ grade_columns:
     direction: lower_better
     weight: 1
     method: robust_z
+    transform: abs
