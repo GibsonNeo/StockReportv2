@@ -1,0 +1,44 @@
+
+# grading.yml
+# Edit the names in source_column to match the exact header names in your two CSVs.
+# The script will merge on join_key, then compute quartile grades with a small decile nudge.
+# You can keep the weights you proposed.
+#
+# For directions, use "higher_better" or "lower_better".
+# The output adds *_grade columns per metric, then combined_weighted_1_to_4 and combined_percent_0_to_100.
+
+join_key: ticker
+join_type: inner            # inner, left_a, left_b, outer
+n_quartiles: 4
+decile_nudge: 0.25
+
+grade_columns:
+  - name: mom_12_1_spdji
+    source_column: mom_12_1_spdji          # from your momentum CSV
+    direction: higher_better
+    weight: 3
+
+  - name: trend_consistency
+    source_column: trend_consistency       # from your momentum CSV
+    direction: higher_better
+    weight: 1
+
+  - name: grade_score
+    source_column: grade_score             # from your fundamentals CSV
+    direction: higher_better
+    weight: 4
+
+  - name: foreign_grade_score
+    source_column: foreign_grade_score     # from your fundamentals CSV
+    direction: higher_better
+    weight: 3
+
+  - name: ulcer_12_1
+    source_column: ulcer_12_1             # from your momentum CSV
+    direction: lower_better
+    weight: 1
+
+  - name: max_dd_12_1
+    source_column: max_dd_12_1            # from your momentum CSV
+    direction: lower_better
+    weight: 1

@@ -1,44 +1,56 @@
 
-# grading.yml
-# Edit the names in source_column to match the exact header names in your two CSVs.
-# The script will merge on join_key, then compute quartile grades with a small decile nudge.
-# You can keep the weights you proposed.
-#
-# For directions, use "higher_better" or "lower_better".
-# The output adds *_grade columns per metric, then combined_weighted_1_to_4 and combined_percent_0_to_100.
-
 join_key: ticker
-join_type: inner            # inner, left_a, left_b, outer
+join_type: inner
+
+scoring:
+  mode: standardized
+  map_to: percentile_0_100
+
+standardization:
+  default_method: zscore
+  default_clip_z: 3.0
+  default_pct_floor: 0.01
+  default_pct_ceiling: 0.99
+
 n_quartiles: 4
 decile_nudge: 0.25
 
 grade_columns:
   - name: mom_12_1_spdji
-    source_column: mom_12_1_spdji          # from your momentum CSV
+    source_column: mom_12_1_spdji
     direction: higher_better
-    weight: 3
+    weight: 2
+    method: percentile
+    transform: none
 
   - name: trend_consistency
-    source_column: trend_consistency       # from your momentum CSV
+    source_column: trend_consistency
     direction: higher_better
     weight: 1
+    method: percentile
 
   - name: grade_score
-    source_column: grade_score             # from your fundamentals CSV
+    source_column: grade_score
     direction: higher_better
-    weight: 4
+    weight: 2
+    method: zscore
+    clip_z: 2.5
 
   - name: foreign_grade_score
-    source_column: foreign_grade_score     # from your fundamentals CSV
+    source_column: foreign_grade_score
     direction: higher_better
-    weight: 3
+    weight: 2
+    method: zscore
 
   - name: ulcer_12_1
-    source_column: ulcer_12_1             # from your momentum CSV
+    source_column: ulcer_12_1
     direction: lower_better
     weight: 1
+    method: robust_z
+    clip_z: 2.5
 
   - name: max_dd_12_1
-    source_column: max_dd_12_1            # from your momentum CSV
+    source_column: max_dd_12_1
     direction: lower_better
     weight: 1
+    method: robust_z
