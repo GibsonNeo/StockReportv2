@@ -23,39 +23,39 @@ grade_columns:
   - name: mom_12_1_spdji
     source_column: mom_12_1_spdji
     direction: higher_better
-    weight: 2
+    weight: 6
     method: percentile
     transform: none
 
   - name: trend_consistency
     source_column: trend_consistency
     direction: higher_better
-    weight: 1
+    weight: .5
     method: percentile
 
   - name: grade_score
     source_column: grade_score
     direction: higher_better
-    weight: 2
+    weight: 6
     method: zscore
     clip_z: 2.5
 
   - name: foreign_grade_score
     source_column: foreign_grade_score
     direction: higher_better
-    weight: 2
+    weight: 6
     method: zscore
 
   - name: ulcer_12_1
     source_column: ulcer_12_1
     direction: lower_better
-    weight: 1
+    weight: .5
     method: robust_z
     clip_z: 2.5
 
   - name: max_dd_12_1
     source_column: max_dd_12_1
     direction: lower_better
-    weight: 1
+    weight: .5
     method: robust_z
     transform: abs

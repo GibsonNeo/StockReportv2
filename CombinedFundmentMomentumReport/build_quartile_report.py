@@ -133,6 +133,13 @@ def standardize_one(values: pd.Series, method: str, clip_z: float, pct_floor: fl
     if transform == "log1p":
         x = x.where(x >= 0, np.nan)
         x = np.log1p(x)
+    elif transform == "abs":
+        x = x.abs()
+    elif transform == "negate":
+        x = -x
+    
+        x = x.where(x >= 0, np.nan)
+        x = np.log1p(x)
 
     if method == "zscore":
         s = _std_z(x)
@@ -271,13 +278,23 @@ def compute_standardized_scores(df: pd.DataFrame, spec: List[Dict[str, Any]], st
 def reorder_after_column(df: pd.DataFrame, target_col: str, insert_col: str) -> pd.DataFrame:
     if insert_col not in df.columns:
         return df
-    if target_col not in df.columns:
-        return df
-    cols = list(df.columns)
-    cols.remove(insert_col)
-    idx = cols.index(target_col) + 1
-    cols.insert(idx, insert_col)
-    return df[cols]
+    # exact match first
+    if target_col in df.columns:
+        cols = list(df.columns)
+        cols.remove(insert_col)
+        idx = cols.index(target_col) + 1
+        cols.insert(idx, insert_col)
+        return df[cols]
+    # try case-insensitive match
+    lowered = {c.lower(): c for c in df.columns}
+    if target_col.lower() in lowered:
+        anchor = lowered[target_col.lower()]
+        cols = list(df.columns)
+        cols.remove(insert_col)
+        idx = cols.index(anchor) + 1
+        cols.insert(idx, insert_col)
+        return df[cols]
+    return df
 
 def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
     try:
