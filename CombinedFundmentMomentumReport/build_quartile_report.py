@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 build_score_report.py
@@ -299,12 +298,23 @@ def reorder_after_column(df: pd.DataFrame, target_col: str, insert_col: str) -> 
 def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
     try:
         import openpyxl
-        from openpyxl.utils import get_column_letter
         from openpyxl.styles import PatternFill
-        from openpyxl.formatting.rule import CellIsRule
+        from openpyxl.formatting.rule import FormulaRule
+        from openpyxl.utils import get_column_letter
     except Exception:
         # silently skip formatting if openpyxl is not available
         return
+
+    def _apply_transform(series: pd.Series, transform: str) -> pd.Series:
+        s = pd.to_numeric(series, errors="coerce")
+        if transform == "log1p":
+            s = s.where(s >= 0, np.nan)
+            return np.log1p(s)
+        if transform == "abs":
+            return s.abs()
+        if transform == "negate":
+            return -s
+        return s
 
     wb = openpyxl.load_workbook(path)
     ws = wb.active
@@ -321,7 +331,6 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
         idx = header_to_col.get(col_name)
         if idx is None:
             return None
-        from openpyxl.utils import get_column_letter
         return get_column_letter(idx)
 
     # Build list of columns to format, combined plus each source_column
@@ -337,45 +346,58 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
     # Add combined percent
     combined_col = "combined_z_percent_0_to_100"
     if combined_col in df.columns:
-        target_columns.append((combined_col, "higher_better"))
+        target_columns.append((combined_col, "higher_better", None))
 
     # Add each original metric used for grading
     for item in graded:
         src = item.get("source_column")
         direction = item.get("direction", "higher_better")
+        transform = item.get("transform", "none")
         if src in df.columns:
-            target_columns.append((src, direction))
+            target_columns.append((src, direction, transform))
 
     n_rows = df.shape[0]
     start_row = 2
     end_row = n_rows + 1
 
-    for col_name, direction in target_columns:
+    for col_name, direction, transform in target_columns:
         letter = col_letter(col_name)
         if not letter:
             continue
 
-        # Compute quartiles from data, ignore NaN
-        col_series = pd.to_numeric(df[col_name], errors="coerce")
-        q1 = col_series.quantile(0.25)
-        q2 = col_series.quantile(0.50)
-        q3 = col_series.quantile(0.75)
+        # Compute quartiles from transformed data, ignore NaN
+        s = df[col_name]
+        s_t = _apply_transform(s, transform or "none")
+        q1 = s_t.quantile(0.25)
+        q2 = s_t.quantile(0.50)
+        q3 = s_t.quantile(0.75)
 
         rng = f"{letter}{start_row}:{letter}{end_row}"
+        first_cell = f"{letter}{start_row}"
+
+        # Excel expression that mirrors the transform
+        if (transform or "none") == "abs":
+            expr = f"ABS({first_cell})"
+        elif (transform or "none") == "negate":
+            expr = f"(-{first_cell})"
+        elif (transform or "none") == "log1p":
+            expr = f"LN(1+MAX({first_cell},0))"
+        else:
+            expr = first_cell
 
         # Color assignment for higher better
         top_fill, q3_fill, q2_fill, bottom_fill = fill_green, fill_blue, fill_yell, fill_red
         if direction == "lower_better":
             top_fill, q3_fill, q2_fill, bottom_fill = fill_red, fill_yell, fill_blue, fill_green
 
-        # Bottom quartile, less than or equal q1
-        ws.conditional_formatting.add(rng, CellIsRule(operator="lessThanOrEqual", formula=[str(q1)], fill=bottom_fill))
-        # Second quartile, between q1 and q2
-        ws.conditional_formatting.add(rng, CellIsRule(operator="between", formula=[str(q1), str(q2)], fill=q2_fill))
-        # Third quartile, between q2 and q3
-        ws.conditional_formatting.add(rng, CellIsRule(operator="between", formula=[str(q2), str(q3)], fill=q3_fill))
-        # Top quartile, greater than or equal q3
-        ws.conditional_formatting.add(rng, CellIsRule(operator="greaterThanOrEqual", formula=[str(q3)], fill=top_fill))
+        # Bottom quartile
+        ws.conditional_formatting.add(rng, FormulaRule(formula=[f'{expr}<={q1}'], stopIfTrue=False, fill=bottom_fill))
+        # Second quartile
+        ws.conditional_formatting.add(rng, FormulaRule(formula=[f'AND({expr}>{q1},{expr}<={q2})'], stopIfTrue=False, fill=q2_fill))
+        # Third quartile
+        ws.conditional_formatting.add(rng, FormulaRule(formula=[f'AND({expr}>{q2},{expr}<={q3})'], stopIfTrue=False, fill=q3_fill))
+        # Top quartile
+        ws.conditional_formatting.add(rng, FormulaRule(formula=[f'{expr}>{q3}'], stopIfTrue=False, fill=top_fill))
 
     wb.save(path)
 

@@ -32,7 +32,7 @@ grade_columns:
     direction: higher_better
     weight: 1
     method: zscore
-    #clip_z: 2.0
+    clip_z: 2.0
 
   - name: grade_score
     source_column: grade_score
@@ -52,13 +52,13 @@ grade_columns:
     source_column: ulcer_12_1
     direction: lower_better
     weight: 1
-    method: robust_z
-    #clip_z: 2.0
+    method: zscore
+    clip_z: 2.0
 
   - name: max_dd_12_1
     source_column: max_dd_12_1
     direction: lower_better
     weight: 1
-    method: robust_z
+    method: zscore
     transform: abs
-    #clip_z: 2.0
+    clip_z: 2.0
