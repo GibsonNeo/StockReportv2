@@ -11,6 +11,20 @@ formatting:
   autosize_padding_chars: 2
   visible_columns: [ticker, type, sector_A, combined_z_percent_0_to_100, mom_12_1_spdji, ulcer_12_1, max_dd_12_1, trend_consistency, grade_score, foreign_grade_score]
 
+io:
+  input_a:
+    dir: "./MomentumReport/intake"
+    pattern: "momentum_report*.csv"   # glob
+    pick: "latest"                    # or "first"
+    path: null                        # set a full path to override dir and pattern
+  input_b:
+    dir: "./FundamentalReport/intake"
+    pattern: "fundamental_report*.csv"
+    pick: "latest"
+    path: null
+  output:
+    dir: "./reports"
+    filename: "Combined-Score-Report.xlsx"
 
 scoring:
   mode: standardized

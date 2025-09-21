@@ -7,12 +7,15 @@ Combines two CSVs on a key and computes scores for selected columns using one of
   2) standardized, continuous scores using zscore, robust_z, percentile, or minmax
 
 Writes Excel or CSV. If Excel, can optionally apply conditional formatting by quartiles.
+
+Also supports config-driven inputs and outputs. If CLI flags are omitted, the script reads grading.yml,
+discovers input files, and writes the report to the configured reports directory.
 """
 
 import argparse
 import sys
 from pathlib import Path
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 import pandas as pd
 import numpy as np
@@ -22,8 +25,24 @@ import yaml
 
 def read_config(path: Path) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
-        cfg = yaml.safe_load(f)
-    return cfg or {}
+        cfg = yaml.safe_load(f) or {}
+    return cfg
+
+def find_config(cli_config: Optional[str]) -> Path:
+    if cli_config:
+        p = Path(cli_config)
+        if not p.exists():
+            sys.stderr.write(f"Config not found at {p}\n")
+            sys.exit(2)
+        return p
+    cwd_yml = Path("grading.yml")
+    if cwd_yml.exists():
+        return cwd_yml
+    script_dir_yml = Path(__file__).resolve().parent / "grading.yml"
+    if script_dir_yml.exists():
+        return script_dir_yml
+    sys.stderr.write("No --config provided and grading.yml not found in CWD or script folder\n")
+    sys.exit(2)
 
 def _upper_strip(s: pd.Series) -> pd.Series:
     return s.astype(str).str.strip().str.upper()
@@ -32,16 +51,49 @@ def _coerce_numeric(s: pd.Series) -> pd.Series:
     s2 = pd.to_numeric(s.astype(str).str.replace("%","", regex=False).str.strip(), errors="coerce")
     return s2
 
+def resolve_input_path(io_cfg: Dict[str, Any]) -> Path:
+    path = io_cfg.get("path")
+    if path:
+        p = Path(path)
+        if not p.exists():
+            sys.stderr.write(f"Input path does not exist: {p}\n")
+            sys.exit(2)
+        return p
+
+    dir_ = io_cfg.get("dir", ".")
+    pattern = io_cfg.get("pattern", "*.csv")
+    pick = str(io_cfg.get("pick", "latest")).lower()
+
+    base = Path(dir_)
+    if not base.exists():
+        sys.stderr.write(f"Input directory does not exist: {base}\n")
+        sys.exit(2)
+
+    matches = sorted(base.glob(pattern))
+    if not matches:
+        sys.stderr.write(f"No files matched pattern '{pattern}' in {base}\n")
+        sys.exit(2)
+
+    if pick == "first":
+        return matches[0]
+    return max(matches, key=lambda p: p.stat().st_mtime)
+
+def resolve_output_path(io_cfg: Dict[str, Any]) -> Path:
+    out_cfg = io_cfg.get("output", {})
+    dir_ = out_cfg.get("dir", "./reports")
+    name = out_cfg.get("filename", "Combined-Score-Report.xlsx")
+    out_dir = Path(dir_)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir / name
+
 # -------------------- quartile mode helpers --------------------
 
 def _qcut_safe(values: pd.Series, q: int) -> Tuple[pd.Series, bool]:
     idx = values.index
     x = values.dropna()
     used_fallback = False
-
     if len(x) == 0:
         return pd.Series(np.nan, index=idx), used_fallback
-
     try:
         labels = pd.qcut(x, q=q, labels=list(range(1, q+1)), duplicates="drop")
         if len(pd.unique(labels)) < q:
@@ -51,7 +103,6 @@ def _qcut_safe(values: pd.Series, q: int) -> Tuple[pd.Series, bool]:
         r = x.rank(method="average", ascending=True)
         edges = np.linspace(r.min(), r.max(), num=q+1)
         labels = pd.cut(r, bins=edges, include_lowest=True, labels=list(range(1, q+1)))
-
     out = pd.Series(np.nan, index=idx, dtype="float")
     out.loc[labels.index] = labels.astype(float)
     return out, used_fallback
@@ -77,14 +128,11 @@ def grade_quartile(values: pd.Series, higher_is_better: bool, n_quartiles: int, 
         q_grade = q_raw.astype(float)
     else:
         q_grade = q_raw.map(lambda q: np.nan if pd.isna(q) else (n_quartiles + 1 - int(q))).astype(float)
-
     top_mask, bot_mask = _decile_masks(values, higher_is_better=higher_is_better)
     nudge = pd.Series(0.0, index=values.index, dtype="float")
     nudge[top_mask] = decile_nudge
     nudge[bot_mask] = -decile_nudge
-
     col_grade = (q_grade + nudge).clip(lower=1.0, upper=float(n_quartiles)).round(2)
-
     return pd.DataFrame({
         "quartile_raw": q_raw.astype("float"),
         "quartile_grade": q_grade.astype("float"),
@@ -116,8 +164,7 @@ def _robust_z(values: pd.Series) -> pd.Series:
     return (values - med) / (mad * 1.4826)
 
 def _percentile_rank(values: pd.Series) -> pd.Series:
-    x = values.rank(method="average", pct=True)
-    return x
+    return values.rank(method="average", pct=True)
 
 def _minmax_pct(values: pd.Series, p_low: float, p_high: float) -> pd.Series:
     lo = values.quantile(p_low)
@@ -128,7 +175,6 @@ def _minmax_pct(values: pd.Series, p_low: float, p_high: float) -> pd.Series:
 
 def standardize_one(values: pd.Series, method: str, clip_z: float, pct_floor: float, pct_ceiling: float, transform: str) -> pd.Series:
     x = values.copy()
-
     if transform == "log1p":
         x = x.where(x >= 0, np.nan)
         x = np.log1p(x)
@@ -136,10 +182,6 @@ def standardize_one(values: pd.Series, method: str, clip_z: float, pct_floor: fl
         x = x.abs()
     elif transform == "negate":
         x = -x
-    
-        x = x.where(x >= 0, np.nan)
-        x = np.log1p(x)
-
     if method == "zscore":
         s = _std_z(x)
         if clip_z is not None:
@@ -163,18 +205,14 @@ def combine_standardized(scores: Dict[str, pd.Series], weights: Dict[str, float]
     idx = None
     for s in scores.values():
         idx = s.index if idx is None else idx
-
     weighted_sum = pd.Series(0.0, index=idx, dtype="float")
     weight_present = pd.Series(0.0, index=idx, dtype="float")
-
     for name, s in scores.items():
         w = float(weights.get(name, 0.0))
         mask = s.notna()
         weighted_sum.loc[mask] += s[mask] * w
         weight_present.loc[mask] += w
-
     combined_raw = weighted_sum / weight_present.replace(0.0, np.nan)
-
     map_to = map_to or "percentile_0_100"
     if map_to == "linear_0_100":
         out = (combined_raw * 10.0) + 50.0
@@ -189,7 +227,6 @@ def combine_standardized(scores: Dict[str, pd.Series], weights: Dict[str, float]
             out.loc[cr.index] = ranks
     else:
         raise ValueError(f"Unknown map_to {map_to}")
-
     return combined_raw, out, weight_present
 
 # -------------------- main grading pipeline --------------------
@@ -198,17 +235,14 @@ def compute_quartile_scores(df: pd.DataFrame, spec: List[Dict[str, Any]], n_quar
     weighted_sum = pd.Series(0.0, index=df.index, dtype="float")
     weight_present = pd.Series(0.0, index=df.index, dtype="float")
     parts = []
-
     for item in spec:
         name = item["name"]
         src = item["source_column"]
         direction = item.get("direction", "higher_better")
         weight = float(item.get("weight", 1.0))
-
         higher_is_better = direction == "higher_better"
         vals = _coerce_numeric(df[src]) if src in df.columns else pd.Series(np.nan, index=df.index, dtype="float")
         g = grade_quartile(vals, higher_is_better=higher_is_better, n_quartiles=n_quartiles, decile_nudge=decile_nudge)
-
         g = g.rename(columns={
             "quartile_raw": f"{name}_quartile_raw",
             "quartile_grade": f"{name}_quartile_grade",
@@ -217,15 +251,12 @@ def compute_quartile_scores(df: pd.DataFrame, spec: List[Dict[str, Any]], n_quar
             "quartile_fallback_used": f"{name}_quartile_fallback_used",
         })
         parts.append(g)
-
         mask = g[f"{name}_grade_q"].notna()
         weighted_sum.loc[mask] += g.loc[mask, f"{name}_grade_q"] * weight
         weight_present.loc[mask] += weight
-
     out = pd.concat([df] + parts, axis=1)
     combined_1_to_4 = weighted_sum / weight_present.replace(0.0, np.nan)
     combined_percent = ((combined_1_to_4 - 1.0) / 3.0) * 100.0
-
     out["combined_q_weighted_1_to_4"] = combined_1_to_4.round(3)
     out["combined_q_percent_0_to_100"] = combined_percent.round(2)
     out["combined_q_weights_covered"] = weight_present
@@ -236,11 +267,9 @@ def compute_standardized_scores(df: pd.DataFrame, spec: List[Dict[str, Any]], st
     default_clip_z = std_cfg.get("default_clip_z", 3.0)
     default_pct_floor = std_cfg.get("default_pct_floor", 0.01)
     default_pct_ceiling = std_cfg.get("default_pct_ceiling", 0.99)
-
     standardized = {}
     weights = {}
     parts = []
-
     for item in spec:
         name = item["name"]
         src = item["source_column"]
@@ -251,21 +280,14 @@ def compute_standardized_scores(df: pd.DataFrame, spec: List[Dict[str, Any]], st
         pct_floor = float(item.get("pct_floor", default_pct_floor))
         pct_ceiling = float(item.get("pct_ceiling", default_pct_ceiling))
         transform = item.get("transform", "none")
-
         vals = _coerce_numeric(df[src]) if src in df.columns else pd.Series(np.nan, index=df.index, dtype="float")
-
         s = standardize_one(vals, method=method, clip_z=clip_z, pct_floor=pct_floor, pct_ceiling=pct_ceiling, transform=transform)
-
         if direction == "lower_better":
             s = -s
-
         standardized[name] = s
         weights[name] = weight
-
         parts.append(pd.DataFrame({f"{name}_standardized": s}, index=df.index))
-
     combined_raw, combined_0_100, weights_cov = combine_standardized(standardized, weights, map_to=map_to)
-
     out = pd.concat([df] + parts, axis=1)
     out["combined_z_weighted"] = combined_raw
     out["combined_z_percent_0_to_100"] = combined_0_100
@@ -277,14 +299,12 @@ def compute_standardized_scores(df: pd.DataFrame, spec: List[Dict[str, Any]], st
 def reorder_after_column(df: pd.DataFrame, target_col: str, insert_col: str) -> pd.DataFrame:
     if insert_col not in df.columns:
         return df
-    # exact match first
     if target_col in df.columns:
         cols = list(df.columns)
         cols.remove(insert_col)
         idx = cols.index(target_col) + 1
         cols.insert(idx, insert_col)
         return df[cols]
-    # try case-insensitive match
     lowered = {c.lower(): c for c in df.columns}
     if target_col.lower() in lowered:
         anchor = lowered[target_col.lower()]
@@ -294,7 +314,6 @@ def reorder_after_column(df: pd.DataFrame, target_col: str, insert_col: str) -> 
         cols.insert(idx, insert_col)
         return df[cols]
     return df
-
 
 def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
     try:
@@ -331,68 +350,55 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
     header_to_idx = {cell.value: cell.column for cell in header_row if cell.value is not None}
 
     if visible_cols:
-        # Build a set of header names to keep, case-insensitive
         lowers = {str(h).lower(): h for h in header_to_idx.keys()}
         to_keep_idx = set()
         for want in visible_cols:
             key = str(want).lower()
             if key in lowers:
                 to_keep_idx.add(header_to_idx[lowers[key]])
-        # Hide all not in to_keep_idx
         max_col = ws.max_column
         for col_idx in range(1, max_col + 1):
             if col_idx not in to_keep_idx:
                 ws.column_dimensions[get_column_letter(col_idx)].hidden = True
 
-    # Freeze the header row if requested
+    # Freeze header row
     if bool(fmt_cfg.get("freeze_header", True)):
         ws.freeze_panes = "A2"
 
-    # Add AutoFilter if requested
+    # Add AutoFilter across the full width
     if bool(fmt_cfg.get("add_autofilter", True)):
-        # Determine first and last visible columns for the filter range
-        first_col_idx = 1
-        last_col_idx = ws.max_column
-        # If we hid columns, Excel filter still works across the full width
-        ws.auto_filter.ref = f"{get_column_letter(first_col_idx)}1:{get_column_letter(last_col_idx)}{ws.max_row}"
+        ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
 
     # Autosize columns based on header and sampled data
     if bool(fmt_cfg.get("autosize_columns", True)):
         sample_rows = int(fmt_cfg.get("autosize_sample_rows", 1000))
-        pad = int(fmt_cfg.get("autosize_padding_chars", 2))  # a little extra for filter button
-        max_col = ws.max_column
-        # Build a quick map of max width
+        pad = int(fmt_cfg.get("autosize_padding_chars", 2))
         widths = {}
-        # Header widths
         for cell in header_row:
-            if cell.value is None: 
+            if cell.value is None:
                 continue
             col = cell.column
             text = str(cell.value)
             widths[col] = max(widths.get(col, 0), len(text))
-        # Sampled data rows
         for row in ws.iter_rows(min_row=2, max_row=min(ws.max_row, 1 + sample_rows)):
             for cell in row:
                 col = cell.column
                 val = cell.value
                 if val is None:
                     continue
-                # stringify, limit very long strings
                 s = str(val)
                 if len(s) > 200:
                     s = s[:200]
                 widths[col] = max(widths.get(col, 0), len(s))
-        # Apply widths with padding, rough excel character to pixel mapping, ~1 char ~ 1 unit
         for col_idx, w in widths.items():
             ws.column_dimensions[get_column_letter(col_idx)].width = max(6, w + pad)
 
-    # Colors for conditional formatting
+    # Colors
     fill_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
     fill_blue  = PatternFill(start_color="CCE5FF", end_color="CCE5FF", fill_type="solid")
     fill_yell  = PatternFill(start_color="FFF3B0", end_color="FFF3B0", fill_type="solid")
     fill_red   = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
 
-    # Conditional formatting targets, combined plus each source column
     graded = cfg.get("grade_columns", [])
     targets = []
     combined_col = "combined_z_percent_0_to_100"
@@ -405,7 +411,6 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
         if src in df.columns:
             targets.append((src, direction, transform))
 
-    # Helper to resolve header to column letter
     def col_letter(col_name: str):
         idx = header_to_idx.get(col_name)
         if idx is None:
@@ -421,7 +426,6 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
         if not letter:
             continue
 
-        # Compute quartiles on transformed data
         s = df[col_name]
         s_t = _apply_transform(s, transform or "none")
         q1 = s_t.quantile(0.25)
@@ -454,22 +458,28 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
 # -------------------- main --------------------
 
 def main():
-    import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--input-a", required=True, help="Path to first CSV")
-    ap.add_argument("--input-b", required=True, help="Path to second CSV")
-    ap.add_argument("--config", required=True, help="Path to grading .yml")
-    ap.add_argument("--out", required=True, help="Output file, .xlsx or .csv")
+    ap.add_argument("--input-a", help="Path to first CSV")
+    ap.add_argument("--input-b", help="Path to second CSV")
+    ap.add_argument("--config", help="Path to grading .yml")
+    ap.add_argument("--out", help="Output file, .xlsx or .csv")
     args = ap.parse_args()
 
-    cfg = read_config(Path(args.config))
+    cfg_path = find_config(args.config)
+    cfg = read_config(cfg_path)
+
+    io_cfg = cfg.get("io", {})
+    in_a = Path(args.input_a) if args.input_a else resolve_input_path(io_cfg.get("input_a", {}))
+    in_b = Path(args.input_b) if args.input_b else resolve_input_path(io_cfg.get("input_b", {}))
+    out_path = Path(args.out) if args.out else resolve_output_path(io_cfg)
+
     key = cfg.get("join_key", "Ticker")
     join_type = cfg.get("join_type", "inner")
     spec = cfg.get("grade_columns", [])
     mode = cfg.get("scoring", {}).get("mode", "standardized")
 
-    df_a = pd.read_csv(args.input_a)
-    df_b = pd.read_csv(args.input_b)
+    df_a = pd.read_csv(in_a)
+    df_b = pd.read_csv(in_b)
 
     if key not in df_a.columns or key not in df_b.columns:
         sys.stderr.write(f"Join key '{key}' must exist in both CSVs\n")
@@ -502,12 +512,10 @@ def main():
         map_to = cfg.get("scoring", {}).get("map_to", "percentile_0_100")
         out = compute_standardized_scores(out, spec=spec, std_cfg=std_cfg, map_to=map_to)
 
-    # Optional, move combined_z_percent_0_to_100 right after a chosen column
     insert_after = cfg.get("formatting", {}).get("insert_combined_after_column", "Sector")
     if "combined_z_percent_0_to_100" in out.columns and insert_after in out.columns:
         out = reorder_after_column(out, target_col=insert_after, insert_col="combined_z_percent_0_to_100")
 
-    out_path = Path(args.out)
     if out_path.suffix.lower() in [".xlsx", ".xlsm", ".xltx", ".xltm"]:
         try:
             import openpyxl  # noqa
@@ -515,9 +523,9 @@ def main():
             sys.stderr.write("openpyxl is required to write Excel files\n")
             sys.exit(2)
         out.to_excel(out_path, index=False)
-        # Apply conditional formatting if enabled
         apply_excel_formatting(out_path, out, cfg)
     else:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
         out.to_csv(out_path, index=False)
 
     print(f"Wrote {out_path} with {len(out)} rows")
