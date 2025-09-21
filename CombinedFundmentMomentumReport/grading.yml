@@ -4,6 +4,13 @@ join_type: inner
 formatting:
   enabled: true
   insert_combined_after_column: sector_A
+  freeze_header: true
+  add_autofilter: true
+  autosize_columns: true
+  autosize_sample_rows: 1000
+  autosize_padding_chars: 2
+  visible_columns: [ticker, type, sector_A, combined_z_percent_0_to_100, mom_12_1_spdji, ulcer_12_1, max_dd_12_1, trend_consistency, grade_score, foreign_grade_score]
+
 
 scoring:
   mode: standardized

@@ -295,6 +295,7 @@ def reorder_after_column(df: pd.DataFrame, target_col: str, insert_col: str) -> 
         return df[cols]
     return df
 
+
 def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
     try:
         import openpyxl
@@ -302,7 +303,6 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
         from openpyxl.formatting.rule import FormulaRule
         from openpyxl.utils import get_column_letter
     except Exception:
-        # silently skip formatting if openpyxl is not available
         return
 
     def _apply_transform(series: pd.Series, transform: str) -> pd.Series:
@@ -319,53 +319,109 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
     wb = openpyxl.load_workbook(path)
     ws = wb.active
 
-    # Colors
+    fmt_cfg = cfg.get("formatting", {})
+    if not bool(fmt_cfg.get("enabled", True)):
+        wb.save(path)
+        return
+
+    # Optional, hide all columns except a whitelist, case-insensitive match
+    visible_cols_cfg = fmt_cfg.get("visible_columns", [])
+    visible_cols = [c.strip() for c in visible_cols_cfg] if isinstance(visible_cols_cfg, list) else []
+    header_row = next(ws.iter_rows(min_row=1, max_row=1))
+    header_to_idx = {cell.value: cell.column for cell in header_row if cell.value is not None}
+
+    if visible_cols:
+        # Build a set of header names to keep, case-insensitive
+        lowers = {str(h).lower(): h for h in header_to_idx.keys()}
+        to_keep_idx = set()
+        for want in visible_cols:
+            key = str(want).lower()
+            if key in lowers:
+                to_keep_idx.add(header_to_idx[lowers[key]])
+        # Hide all not in to_keep_idx
+        max_col = ws.max_column
+        for col_idx in range(1, max_col + 1):
+            if col_idx not in to_keep_idx:
+                ws.column_dimensions[get_column_letter(col_idx)].hidden = True
+
+    # Freeze the header row if requested
+    if bool(fmt_cfg.get("freeze_header", True)):
+        ws.freeze_panes = "A2"
+
+    # Add AutoFilter if requested
+    if bool(fmt_cfg.get("add_autofilter", True)):
+        # Determine first and last visible columns for the filter range
+        first_col_idx = 1
+        last_col_idx = ws.max_column
+        # If we hid columns, Excel filter still works across the full width
+        ws.auto_filter.ref = f"{get_column_letter(first_col_idx)}1:{get_column_letter(last_col_idx)}{ws.max_row}"
+
+    # Autosize columns based on header and sampled data
+    if bool(fmt_cfg.get("autosize_columns", True)):
+        sample_rows = int(fmt_cfg.get("autosize_sample_rows", 1000))
+        pad = int(fmt_cfg.get("autosize_padding_chars", 2))  # a little extra for filter button
+        max_col = ws.max_column
+        # Build a quick map of max width
+        widths = {}
+        # Header widths
+        for cell in header_row:
+            if cell.value is None: 
+                continue
+            col = cell.column
+            text = str(cell.value)
+            widths[col] = max(widths.get(col, 0), len(text))
+        # Sampled data rows
+        for row in ws.iter_rows(min_row=2, max_row=min(ws.max_row, 1 + sample_rows)):
+            for cell in row:
+                col = cell.column
+                val = cell.value
+                if val is None:
+                    continue
+                # stringify, limit very long strings
+                s = str(val)
+                if len(s) > 200:
+                    s = s[:200]
+                widths[col] = max(widths.get(col, 0), len(s))
+        # Apply widths with padding, rough excel character to pixel mapping, ~1 char ~ 1 unit
+        for col_idx, w in widths.items():
+            ws.column_dimensions[get_column_letter(col_idx)].width = max(6, w + pad)
+
+    # Colors for conditional formatting
     fill_green = PatternFill(start_color="CCFFCC", end_color="CCFFCC", fill_type="solid")
     fill_blue  = PatternFill(start_color="CCE5FF", end_color="CCE5FF", fill_type="solid")
     fill_yell  = PatternFill(start_color="FFF3B0", end_color="FFF3B0", fill_type="solid")
     fill_red   = PatternFill(start_color="FFCCCC", end_color="FFCCCC", fill_type="solid")
 
-    # Helper to find column letter by header
-    header_to_col = {cell.value: cell.column for cell in next(ws.iter_rows(min_row=1, max_row=1))}
-    def col_letter(col_name: str):
-        idx = header_to_col.get(col_name)
-        if idx is None:
-            return None
-        return get_column_letter(idx)
-
-    # Build list of columns to format, combined plus each source_column
-    format_cfg = cfg.get("formatting", {})
-    do_format = bool(format_cfg.get("enabled", True))
-    if not do_format:
-        wb.save(path)
-        return
-
+    # Conditional formatting targets, combined plus each source column
     graded = cfg.get("grade_columns", [])
-    target_columns = []
-
-    # Add combined percent
+    targets = []
     combined_col = "combined_z_percent_0_to_100"
     if combined_col in df.columns:
-        target_columns.append((combined_col, "higher_better", None))
-
-    # Add each original metric used for grading
+        targets.append((combined_col, "higher_better", None))
     for item in graded:
         src = item.get("source_column")
         direction = item.get("direction", "higher_better")
         transform = item.get("transform", "none")
         if src in df.columns:
-            target_columns.append((src, direction, transform))
+            targets.append((src, direction, transform))
+
+    # Helper to resolve header to column letter
+    def col_letter(col_name: str):
+        idx = header_to_idx.get(col_name)
+        if idx is None:
+            return None
+        return get_column_letter(idx)
 
     n_rows = df.shape[0]
     start_row = 2
     end_row = n_rows + 1
 
-    for col_name, direction, transform in target_columns:
+    for col_name, direction, transform in targets:
         letter = col_letter(col_name)
         if not letter:
             continue
 
-        # Compute quartiles from transformed data, ignore NaN
+        # Compute quartiles on transformed data
         s = df[col_name]
         s_t = _apply_transform(s, transform or "none")
         q1 = s_t.quantile(0.25)
@@ -375,7 +431,6 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
         rng = f"{letter}{start_row}:{letter}{end_row}"
         first_cell = f"{letter}{start_row}"
 
-        # Excel expression that mirrors the transform
         if (transform or "none") == "abs":
             expr = f"ABS({first_cell})"
         elif (transform or "none") == "negate":
@@ -385,18 +440,13 @@ def apply_excel_formatting(path: Path, df: pd.DataFrame, cfg: Dict[str, Any]):
         else:
             expr = first_cell
 
-        # Color assignment for higher better
         top_fill, q3_fill, q2_fill, bottom_fill = fill_green, fill_blue, fill_yell, fill_red
         if direction == "lower_better":
             top_fill, q3_fill, q2_fill, bottom_fill = fill_red, fill_yell, fill_blue, fill_green
 
-        # Bottom quartile
         ws.conditional_formatting.add(rng, FormulaRule(formula=[f'{expr}<={q1}'], stopIfTrue=False, fill=bottom_fill))
-        # Second quartile
         ws.conditional_formatting.add(rng, FormulaRule(formula=[f'AND({expr}>{q1},{expr}<={q2})'], stopIfTrue=False, fill=q2_fill))
-        # Third quartile
         ws.conditional_formatting.add(rng, FormulaRule(formula=[f'AND({expr}>{q2},{expr}<={q3})'], stopIfTrue=False, fill=q3_fill))
-        # Top quartile
         ws.conditional_formatting.add(rng, FormulaRule(formula=[f'{expr}>{q3}'], stopIfTrue=False, fill=top_fill))
 
     wb.save(path)
