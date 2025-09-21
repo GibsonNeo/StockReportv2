@@ -1,21 +1,21 @@
-
 join_key: ticker
 join_type: inner
 
 formatting:
   enabled: true
-  insert_combined_after_column: Sector
+  insert_combined_after_column: sector_A
 
 scoring:
   mode: standardized
   map_to: percentile_0_100
 
 standardization:
-  default_method: zscore
-  default_clip_z: 3.0
+  default_method: zscore          # zscore for most metrics, robust_z for risk below
+  default_clip_z: 3.0             # gentle cap so one extreme does not swamp the blend
   default_pct_floor: 0.01
   default_pct_ceiling: 0.99
 
+# Used only if you switch to quartile or both
 n_quartiles: 4
 decile_nudge: 0.25
 
@@ -23,39 +23,42 @@ grade_columns:
   - name: mom_12_1_spdji
     source_column: mom_12_1_spdji
     direction: higher_better
-    weight: 6
-    method: percentile
-    transform: none
+    weight: 5
+    method: zscore
+    #clip_z: 2.5
 
   - name: trend_consistency
     source_column: trend_consistency
     direction: higher_better
-    weight: .5
-    method: percentile
+    weight: 1
+    method: zscore
+    #clip_z: 2.0
 
   - name: grade_score
     source_column: grade_score
     direction: higher_better
     weight: 6
     method: zscore
-    clip_z: 2.5
+    #clip_z: 2.5
 
   - name: foreign_grade_score
     source_column: foreign_grade_score
     direction: higher_better
     weight: 6
     method: zscore
+    #clip_z: 2.5
 
   - name: ulcer_12_1
     source_column: ulcer_12_1
     direction: lower_better
-    weight: .5
+    weight: 1
     method: robust_z
-    clip_z: 2.5
+    #clip_z: 2.0
 
   - name: max_dd_12_1
     source_column: max_dd_12_1
     direction: lower_better
-    weight: .5
+    weight: 1
     method: robust_z
     transform: abs
+    #clip_z: 2.0
